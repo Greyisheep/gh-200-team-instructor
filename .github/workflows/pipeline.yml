@@ -55,6 +55,7 @@ jobs:
   deploy:
     name: Deploy to Cloud Run
     needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'   # fix 4: PRs test, main deploys
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: production    # fix 2: the gate, and what Google trusts
