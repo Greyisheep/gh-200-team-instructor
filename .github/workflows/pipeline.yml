@@ -54,6 +54,7 @@ jobs:
     needs: test
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    environment: production    # fix 2: the gate, and what Google trusts
     permissions:
       contents: read
       id-token: write          # fix 1: the job may now ask GitHub for a token
