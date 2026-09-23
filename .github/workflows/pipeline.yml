@@ -1,9 +1,5 @@
 name: Pipeline
 
-# Stage 1, what you start with: every pull request and every push to main
-# builds the page into an image and checks it renders. Nothing is deployed yet.
-# LAB.md tells you what to add next.
-
 on:
   pull_request:
     branches: [main]
@@ -12,7 +8,11 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: read              # the default ceiling for every job
+
+concurrency:                  # cancel stale PR runs, never a run on main
+  group: pipeline-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   IMAGE: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT }}/${{ vars.AR_REPO }}/frontend
@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
-      tag: ${{ steps.version.outputs.tag }}     # fix 3: publish it from the job
+      tag: ${{ steps.version.outputs.tag }}      # trap 3: publish it from the job
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -55,15 +55,20 @@ jobs:
   deploy:
     name: Deploy to Cloud Run
     needs: test
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'   # fix 4: PRs test, main deploys
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'   # trap 4
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    environment: production    # fix 2: the gate, and what Google trusts
-    permissions:
+    environment:                                  # trap 2: the gate, and what Google trusts
+      name: production
+      url: ${{ steps.deploy.outputs.url }}
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    permissions:                                  # trap 1: allow the job to ask for a token
       contents: read
-      id-token: write          # fix 1: the job may now ask GitHub for a token
+      id-token: write
     env:
-      TAG: ${{ needs.test.outputs.tag }}   # fix 3: read it from the job that made it
+      TAG: ${{ needs.test.outputs.tag }}          # trap 3: read it from the other job
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
